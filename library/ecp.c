@@ -962,6 +962,10 @@ int mbedtls_ecp_tls_read_group_id( mbedtls_ecp_group_id *grp,
     ECP_VALIDATE_RET( buf  != NULL );
     ECP_VALIDATE_RET( *buf != NULL );
 
+#if defined(MBEDTLS_SSL_PROTO_TLS1_3)
+    if (len < 2)
+        return(MBEDTLS_ERR_ECP_BAD_INPUT_DATA);
+#else 
     /*
      * We expect at least three bytes (see below)
      */
@@ -973,6 +977,7 @@ int mbedtls_ecp_tls_read_group_id( mbedtls_ecp_group_id *grp,
      */
     if( *(*buf)++ != MBEDTLS_ECP_TLS_NAMED_CURVE )
         return( MBEDTLS_ERR_ECP_BAD_INPUT_DATA );
+#endif /* MBEDTLS_SSL_PROTO_TLS1_3 */
 
     /*
      * Next two bytes are the namedcurve value
@@ -1003,6 +1008,15 @@ int mbedtls_ecp_tls_write_group( const mbedtls_ecp_group *grp, size_t *olen,
     if( ( curve_info = mbedtls_ecp_curve_info_from_grp_id( grp->id ) ) == NULL )
         return( MBEDTLS_ERR_ECP_BAD_INPUT_DATA );
 
+#if defined(MBEDTLS_SSL_PROTO_TLS1_3)
+    *olen = 2;
+    if (blen < *olen)
+        return(MBEDTLS_ERR_ECP_BUFFER_TOO_SMALL);
+
+    // Two bytes for named curve
+    buf[0] = curve_info->tls_id >> 8;
+    buf[1] = curve_info->tls_id & 0xFF;
+#else 
     /*
      * We are going to write 3 bytes (see below)
      */
@@ -1020,6 +1034,7 @@ int mbedtls_ecp_tls_write_group( const mbedtls_ecp_group *grp, size_t *olen,
      */
     buf[0] = curve_info->tls_id >> 8;
     buf[1] = curve_info->tls_id & 0xFF;
+#endif /* MBEDTLS_SSL_PROTO_TLS1_3 */
 
     return( 0 );
 }
