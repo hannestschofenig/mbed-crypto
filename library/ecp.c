@@ -875,6 +875,17 @@ int mbedtls_ecp_tls_read_point( const mbedtls_ecp_group *grp,
     ECP_VALIDATE_RET( buf != NULL );
     ECP_VALIDATE_RET( *buf != NULL );
 
+#if defined(MBEDTLS_SSL_PROTO_TLS1_3)
+    if( buf_len < 3 )
+        return( MBEDTLS_ERR_ECP_BAD_INPUT_DATA );
+
+    data_len = ( *( *buf ) << 8 ) | *( *buf+1 );
+    *buf += 2; 
+
+    if (data_len < 1 || data_len > buf_len - 2 )
+        return(MBEDTLS_ERR_ECP_BAD_INPUT_DATA);
+
+#else 
     /*
      * We must have at least two bytes (1 for length, at least one for data)
      */
@@ -884,6 +895,7 @@ int mbedtls_ecp_tls_read_point( const mbedtls_ecp_group *grp,
     data_len = *(*buf)++;
     if( data_len < 1 || data_len > buf_len - 1 )
         return( MBEDTLS_ERR_ECP_BAD_INPUT_DATA );
+#endif /* MBEDTLS_SSL_PROTO_TLS1_3 */
 
     /*
      * Save buffer start for read_binary and update buf
@@ -912,6 +924,21 @@ int mbedtls_ecp_tls_write_point( const mbedtls_ecp_group *grp, const mbedtls_ecp
     ECP_VALIDATE_RET( format == MBEDTLS_ECP_PF_UNCOMPRESSED ||
                       format == MBEDTLS_ECP_PF_COMPRESSED );
 
+#if defined(MBEDTLS_SSL_PROTO_TLS1_3)
+    if( blen < 2 )
+        return( MBEDTLS_ERR_ECP_BAD_INPUT_DATA );
+
+    if( ( ret = mbedtls_ecp_point_write_binary( grp, pt, format,
+                    olen, buf + 2, blen - 2) ) != 0 )
+        return( ret );
+
+    // Length
+    *buf++ = (unsigned char)( ( *olen >> 8 ) & 0xFF );
+    *buf++ = (unsigned char)( ( *olen ) & 0xFF );
+    *olen += 2;
+
+#else 
+
     /*
      * buffer length must be at least one, for our length byte
      */
@@ -927,6 +954,8 @@ int mbedtls_ecp_tls_write_point( const mbedtls_ecp_group *grp, const mbedtls_ecp
      */
     buf[0] = (unsigned char) *olen;
     ++*olen;
+
+#endif /* MBEDTLS_SSL_PROTO_TLS1_3 */
 
     return( 0 );
 }
